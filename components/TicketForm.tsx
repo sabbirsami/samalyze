@@ -1,7 +1,5 @@
 'use client';
 
-import type React from 'react';
-
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -22,22 +20,44 @@ export function TicketForm() {
     e.preventDefault();
 
     if (!formData.email || !formData.subject || !formData.message) {
-      toast('Please fill in all fields.');
+      toast.error('Please fill in all fields.');
       return;
     }
 
     setIsLoading(true);
+
     try {
       const response = await fetch('/api/tickets', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: formData.email,
+          subject: formData.subject,
+          message: formData.message,
+        }),
       });
 
-      if (!response.ok) throw new Error('Failed to submit ticket');
-
       const result = await response.json();
-      toast('Your support ticket has been submitted successfully!');
+
+      if (!response.ok) {
+        // Handle API error responses
+        const errorMessage =
+          result.error ||
+          (result.details ? JSON.stringify(result.details) : 'Failed to submit ticket');
+        throw new Error(errorMessage);
+      }
+
+      // Show ticket ID in success message
+      toast.success(
+        `Ticket submitted successfully! ${
+          result.ticketId ? `(ID: ${result.ticketId.slice(-6)})` : ''
+        }`,
+        {
+          description: 'Our AI will process your request shortly.',
+        },
+      );
 
       // Reset form
       setFormData({
@@ -46,18 +66,24 @@ export function TicketForm() {
         message: '',
       });
     } catch (error) {
-      console.error('Error submitting ticket:', error);
-      toast('Failed to submit ticket. Please try again.');
+      console.error('Submission error:', error);
+
+      toast.error('Failed to submit ticket', {
+        description: error instanceof Error ? error.message : 'Please try again later.',
+      });
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-6">
       <div>
-        <Label htmlFor="email">Email *</Label>
+        <Label className="pb-2 block text-sm font-medium" htmlFor="email">
+          Email *
+        </Label>
         <Input
+          className="py-6"
           id="email"
           type="email"
           placeholder="your@email.com"
@@ -68,8 +94,11 @@ export function TicketForm() {
       </div>
 
       <div>
-        <Label htmlFor="subject">Subject *</Label>
+        <Label className="pb-2 block text-sm font-medium" htmlFor="subject">
+          Subject *
+        </Label>
         <Input
+          className="py-6"
           id="subject"
           placeholder="Brief description of your issue"
           value={formData.subject}
@@ -79,26 +108,28 @@ export function TicketForm() {
       </div>
 
       <div>
-        <Label htmlFor="message">Message *</Label>
+        <Label className="pb-2 block text-sm font-medium" htmlFor="message">
+          Message *
+        </Label>
         <Textarea
+          className="min-h-[200px]"
           id="message"
           placeholder="Please describe your issue in detail..."
           value={formData.message}
           onChange={(e) => setFormData({ ...formData, message: e.target.value })}
-          rows={5}
           required
         />
       </div>
 
-      <Button type="submit" className="w-full" disabled={isLoading}>
+      <Button type="submit" className="w-full py-6 text-md font-semibold" disabled={isLoading}>
         {isLoading ? (
           <>
-            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            <Loader2 className="w-5 h-5 mr-2 animate-spin" />
             Processing...
           </>
         ) : (
           <>
-            <Send className="w-4 h-4 mr-2" />
+            <Send className="w-5 h-5 mr-2" />
             Submit Ticket
           </>
         )}

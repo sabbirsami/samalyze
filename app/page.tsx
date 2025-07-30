@@ -11,19 +11,19 @@ export default function HomePage() {
     <div className="min-h-screen bg-background">
       <Header />
 
-      <main className="container mx-auto px-4 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <main className=" ">
+        <div className="grid grid-cols-1 lg:grid-cols-3 ">
           {/* Left Column - Ticket Submission */}
-          <div className="lg:col-span-1 space-y-6">
-            <div className="mb-8">
+          <div className="lg:col-span-1 border-e h-[93dvh] py-8 space-y-6 ">
+            <div className="mb-8 px-12 border-b pb-6">
               <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-2">
                 AI Support System
               </h1>
-              <p className="text-lg text-gray-600 dark:text-gray-300">
+              <code className=" text-gray-600/65 dark:text-gray-300">
                 Get instant AI-powered support
-              </p>
+              </code>
             </div>
-            <Card>
+            <Card className="border-0 px-6 shadow-none">
               <CardHeader>
                 <CardTitle>Submit Support Ticket</CardTitle>
                 <CardDescription>Describe your issue and get AI assistance</CardDescription>
@@ -35,7 +35,7 @@ export default function HomePage() {
           </div>
 
           {/* Right Column - Stats */}
-          <div className="lg:col-span-2 space-y-6">
+          <div className="lg:col-span-2 space-y-6 py-8 px-6 ">
             <Suspense fallback={<StatsSkeleton />}>
               <TicketStats />
             </Suspense>
