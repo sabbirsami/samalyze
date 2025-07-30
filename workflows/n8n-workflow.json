@@ -1,91 +1,181 @@
 {
+  "meta": {
+    "instanceId": "n8n-workflow"
+  },
   "nodes": [
     {
-      "parameters": {},
-      "name": "Start",
-      "type": "n8n-nodes-base.start",
-      "typeVersion": 1,
-      "position": [250, 300]
-    },
-    {
       "parameters": {
-        "url": "={{$env.NEXT_PUBLIC_APP_URL}}/api/webhooks/n8n",
+        "httpMethod": "POST",
+        "path": "support-ticket",
         "options": {}
       },
-      "name": "Next.js Webhook",
-      "type": "n8n-nodes-base.httpRequest",
+      "id": "webhook-node",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
       "typeVersion": 1,
-      "position": [450, 300]
+      "position": [240, 300],
+      "webhookId": "support-ticket-webhook"
     },
     {
       "parameters": {
-        "functionCode": "return {\n  ticketId: $input.first().json.ticketId,\n  message: $input.first().json.message,\n  email: $input.first().json.email,\n  subject: $input.first().json.subject\n};"
+        "functionCode": "// Extract and validate incoming data\nconst body = $input.first().json.body;\n\nif (!body || !body.ticketId || !body.message) {\n  throw new Error('Missing required fields: ticketId or message');\n}\n\nreturn {\n  ticketId: body.ticketId,\n  message: body.message,\n  email: body.email || '',\n  subject: body.subject || 'Support Request'\n};"
       },
+      "id": "prepare-data-node",
       "name": "Prepare Data",
       "type": "n8n-nodes-base.function",
       "typeVersion": 1,
-      "position": [650, 300]
+      "position": [440, 300]
     },
     {
       "parameters": {
-        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={{$env.GEMINI_API_KEY}}",
-        "options": {
-          "body": {
-            "contents": [
-              {
-                "parts": [
-                  {
-                    "text": "Analyze this customer support message and provide:\n1. Sentiment: positive, negative, or neutral\n2. Intent: question, complaint, compliment, or other\n3. Response: A helpful, professional response (max 200 words)\n\nMessage: \"{{$node[\"Prepare Data\"].json[\"message\"]}}\"\n\nRespond in JSON format:\n{\n  \"sentiment\": \"positive|negative|neutral\",\n  \"intent\": \"question|complaint|compliment|other\",\n  \"response\": \"Your professional response here\"\n}"
-                  }
-                ]
-              }
-            ],
-            "generationConfig": {
-              "temperature": 0.7,
-              "topK": 40,
-              "topP": 0.95,
-              "maxOutputTokens": 1024
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
             }
-          }
+          ]
         },
-        "authentication": "none",
-        "headers": {
-          "Content-Type": "application/json"
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "key",
+              "value": "={{$env.GEMINI_API_KEY}}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "body": {
+          "contents": [
+            {
+              "parts": [
+                {
+                  "text": "=Analyze this customer support message and provide a JSON response with sentiment analysis, intent classification, and a helpful response.\n\nCustomer Message: \"{{$node[\"Prepare Data\"].json[\"message\"]}}\"\n\nPlease respond with ONLY a JSON object in this exact format:\n{\n  \"sentiment\": \"positive\",\n  \"intent\": \"question\",\n  \"response\": \"Thank you for contacting us. [Your helpful response here]\"\n}\n\nSentiment options: positive, negative, neutral\nIntent options: question, complaint, compliment, request, other\nKeep response under 200 words and professional."
+                }
+              ]
+            }
+          ],
+          "generationConfig": {
+            "temperature": 0.3,
+            "topK": 40,
+            "topP": 0.95,
+            "maxOutputTokens": 512,
+            "candidateCount": 1
+          },
+          "safetySettings": [
+            {
+              "category": "HARM_CATEGORY_HARASSMENT",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
         }
       },
-      "name": "Gemini API",
+      "id": "gemini-api-node",
+      "name": "Gemini AI Analysis",
       "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 1,
-      "position": [850, 300]
+      "typeVersion": 4,
+      "position": [640, 300]
     },
     {
       "parameters": {
-        "url": "={{$env.NEXT_PUBLIC_APP_URL}}/api/tickets/update",
+        "functionCode": "// Parse AI response and prepare webhook data\nconst aiResponse = $input.first().json;\n\nlet analysis;\ntry {\n  // Extract the text content from Gemini response\n  const responseText = aiResponse.candidates[0].content.parts[0].text;\n  \n  // Clean the response text (remove markdown formatting if present)\n  const cleanText = responseText.replace(/```json\\n?|```\\n?/g, '').trim();\n  \n  // Parse the JSON\n  analysis = JSON.parse(cleanText);\n  \n  // Validate required fields\n  if (!analysis.sentiment || !analysis.intent || !analysis.response) {\n    throw new Error('Missing required analysis fields');\n  }\n  \n} catch (error) {\n  console.error('Failed to parse AI response:', error);\n  // Fallback analysis\n  analysis = {\n    sentiment: 'neutral',\n    intent: 'other',\n    response: 'Thank you for contacting us. We have received your message and will respond as soon as possible.'\n  };\n}\n\n// Prepare data for the Next.js webhook\nconst preparedData = $node[\"Prepare Data\"].json;\n\nreturn {\n  ticketId: preparedData.ticketId,\n  email: preparedData.email,\n  subject: preparedData.subject,\n  analysis: analysis\n};"
+      },
+      "id": "process-response-node",
+      "name": "Process AI Response",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [840, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.NEXT_PUBLIC_APP_URL}}/api/webhooks/n8n",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "body": "={{$json}}",
         "options": {
-          "body": {
-            "ticketId": "={{$node[\"Prepare Data\"].json[\"ticketId\"]}}",
-            "analysis": "={{JSON.parse($node[\"Gemini API\"].json.candidates[0].content.parts[0].text)}}"
-          }
+          "timeout": 10000
         }
       },
+      "id": "update-ticket-node",
       "name": "Update Ticket",
       "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 1,
-      "position": [1050, 300]
+      "typeVersion": 4,
+      "position": [1040, 300]
     }
   ],
   "connections": {
-    "Start": {
-      "main": [[{ "node": "Next.js Webhook", "type": "main", "index": 0 }]]
-    },
-    "Next.js Webhook": {
-      "main": [[{ "node": "Prepare Data", "type": "main", "index": 0 }]]
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Prepare Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Prepare Data": {
-      "main": [[{ "node": "Gemini API", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Gemini AI Analysis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
-    "Gemini API": {
-      "main": [[{ "node": "Update Ticket", "type": "main", "index": 0 }]]
+    "Gemini AI Analysis": {
+      "main": [
+        [
+          {
+            "node": "Process AI Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process AI Response": {
+      "main": [
+        [
+          {
+            "node": "Update Ticket",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
-  }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 1,
+  "updatedAt": "2025-01-30T00:00:00.000Z",
+  "versionId": "1"
 }
