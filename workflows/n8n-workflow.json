@@ -1,0 +1,91 @@
+{
+  "nodes": [
+    {
+      "parameters": {},
+      "name": "Start",
+      "type": "n8n-nodes-base.start",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "url": "={{$env.NEXT_PUBLIC_APP_URL}}/api/webhooks/n8n",
+        "options": {}
+      },
+      "name": "Next.js Webhook",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "return {\n  ticketId: $input.first().json.ticketId,\n  message: $input.first().json.message,\n  email: $input.first().json.email,\n  subject: $input.first().json.subject\n};"
+      },
+      "name": "Prepare Data",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={{$env.GEMINI_API_KEY}}",
+        "options": {
+          "body": {
+            "contents": [
+              {
+                "parts": [
+                  {
+                    "text": "Analyze this customer support message and provide:\n1. Sentiment: positive, negative, or neutral\n2. Intent: question, complaint, compliment, or other\n3. Response: A helpful, professional response (max 200 words)\n\nMessage: \"{{$node[\"Prepare Data\"].json[\"message\"]}}\"\n\nRespond in JSON format:\n{\n  \"sentiment\": \"positive|negative|neutral\",\n  \"intent\": \"question|complaint|compliment|other\",\n  \"response\": \"Your professional response here\"\n}"
+                  }
+                ]
+              }
+            ],
+            "generationConfig": {
+              "temperature": 0.7,
+              "topK": 40,
+              "topP": 0.95,
+              "maxOutputTokens": 1024
+            }
+          }
+        },
+        "authentication": "none",
+        "headers": {
+          "Content-Type": "application/json"
+        }
+      },
+      "name": "Gemini API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "url": "={{$env.NEXT_PUBLIC_APP_URL}}/api/tickets/update",
+        "options": {
+          "body": {
+            "ticketId": "={{$node[\"Prepare Data\"].json[\"ticketId\"]}}",
+            "analysis": "={{JSON.parse($node[\"Gemini API\"].json.candidates[0].content.parts[0].text)}}"
+          }
+        }
+      },
+      "name": "Update Ticket",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [1050, 300]
+    }
+  ],
+  "connections": {
+    "Start": {
+      "main": [[{ "node": "Next.js Webhook", "type": "main", "index": 0 }]]
+    },
+    "Next.js Webhook": {
+      "main": [[{ "node": "Prepare Data", "type": "main", "index": 0 }]]
+    },
+    "Prepare Data": {
+      "main": [[{ "node": "Gemini API", "type": "main", "index": 0 }]]
+    },
+    "Gemini API": {
+      "main": [[{ "node": "Update Ticket", "type": "main", "index": 0 }]]
+    }
+  }
+}

@@ -1,9 +1,8 @@
+import { Header } from '@/components/shared/Header';
 import { Suspense } from 'react';
 
-import { ExpenseForm } from '@/components/ExpenseForm';
-import { QuickStats } from '@/components/QuickStats';
-import { RecentExpenses } from '@/components/RecentExpenses';
-import { Header } from '@/components/shared/Header';
+import { TicketForm } from '@/components/TicketForm';
+import { TicketStats } from '@/components/TicketStats';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -12,38 +11,33 @@ export default function HomePage() {
     <div className="min-h-screen bg-background">
       <Header />
 
-      <main className=" h-full">
-        <div className="grid grid-cols-1 lg:grid-cols-3  h-full ">
-          {/* Left Column - Expense Entry */}
-
-          <div className="lg:col-span-1 bg-muted border-e h-full min-h-screen py-10 px-6">
+      <main className="container mx-auto px-4 py-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Left Column - Ticket Submission */}
+          <div className="lg:col-span-1 space-y-6">
             <div className="mb-8">
               <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-2">
-                Smart Expense Analyzer
+                AI Support System
               </h1>
               <p className="text-lg text-gray-600 dark:text-gray-300">
-                AI-Powered Personal Finance Assistant
+                Get instant AI-powered support
               </p>
             </div>
             <Card>
               <CardHeader>
-                <CardTitle>Add Expense</CardTitle>
-                <CardDescription>Upload a receipt or enter manually</CardDescription>
+                <CardTitle>Submit Support Ticket</CardTitle>
+                <CardDescription>Describe your issue and get AI assistance</CardDescription>
               </CardHeader>
               <CardContent>
-                <ExpenseForm />
+                <TicketForm />
               </CardContent>
             </Card>
           </div>
 
-          {/* Right Column - Stats and Recent */}
-          <div className="lg:col-span-2 space-y-6  py-6 px-6">
-            <Suspense fallback={<QuickStatsSkeleton />}>
-              <QuickStats />
-            </Suspense>
-
-            <Suspense fallback={<RecentExpensesSkeleton />}>
-              <RecentExpenses />
+          {/* Right Column - Stats */}
+          <div className="lg:col-span-2 space-y-6">
+            <Suspense fallback={<StatsSkeleton />}>
+              <TicketStats />
             </Suspense>
           </div>
         </div>
@@ -52,7 +46,7 @@ export default function HomePage() {
   );
 }
 
-function QuickStatsSkeleton() {
+function StatsSkeleton() {
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
       {[...Array(3)].map((_, i) => (
@@ -64,29 +58,5 @@ function QuickStatsSkeleton() {
         </Card>
       ))}
     </div>
-  );
-}
-
-function RecentExpensesSkeleton() {
-  return (
-    <Card>
-      <CardHeader>
-        <Skeleton className="h-6 w-32" />
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-4">
-          {[...Array(5)].map((_, i) => (
-            <div key={i} className="flex items-center space-x-4">
-              <Skeleton className="h-10 w-10 rounded-full" />
-              <div className="space-y-2 flex-1">
-                <Skeleton className="h-4 w-32" />
-                <Skeleton className="h-3 w-24" />
-              </div>
-              <Skeleton className="h-4 w-16" />
-            </div>
-          ))}
-        </div>
-      </CardContent>
-    </Card>
   );
 }

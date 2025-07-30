@@ -6,14 +6,12 @@ import { usePathname } from 'next/navigation';
 import { useState } from 'react';
 
 import { cn } from '@/lib/utils';
-import { BarChart3, Home, Menu, PlusCircle, Settings, X } from 'lucide-react';
+import { BarChart3, Home, Menu, MessageSquare, X } from 'lucide-react';
 import { ThemeToggle } from '../theme/ThemeToggle';
 
 const navigation = [
   { name: 'Home', href: '/', icon: Home },
   { name: 'Dashboard', href: '/dashboard', icon: BarChart3 },
-  { name: 'Analytics', href: '/analytics', icon: BarChart3 },
-  { name: 'Settings', href: '/settings', icon: Settings },
 ];
 
 export function Header() {
@@ -28,9 +26,9 @@ export function Header() {
           <div className="flex items-center">
             <Link href="/" className="flex items-center space-x-2">
               <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center">
-                <PlusCircle className="w-5 h-5 text-white" />
+                <MessageSquare className="w-5 h-5 text-white" />
               </div>
-              <span className="font-bold text-xl text-gray-900 dark:text-white">ExpenseAI</span>
+              <span className="font-bold text-xl text-gray-900 dark:text-white">AI Support</span>
             </Link>
           </div>
 
