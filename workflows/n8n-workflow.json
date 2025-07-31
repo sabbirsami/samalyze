@@ -18,7 +18,7 @@
     },
     {
       "parameters": {
-        "functionCode": "// Extract and validate incoming data\nconst body = $input.first().json.body;\n\nif (!body || !body.ticketId || !body.message) {\n  throw new Error('Missing required fields: ticketId or message');\n}\n\nreturn {\n  ticketId: body.ticketId,\n  message: body.message,\n  email: body.email || '',\n  subject: body.subject || 'Support Request'\n};"
+        "functionCode": "// Extract and validate incoming data\nconst webhookData = $input.first().json;\nconst body = webhookData.body || webhookData;\n\nif (!body || !body.ticketId || !body.message) {\n  throw new Error('Missing required fields: ticketId or message');\n}\n\nconst currentDate = new Date().toISOString();\n\nreturn {\n  ticketId: body.ticketId,\n  message: body.message,\n  email: body.email || 'N/A',\n  subject: body.subject || 'Support Request',\n  timestamp: currentDate,\n  status: 'New'\n};"
       },
       "id": "prepare-data-node",
       "name": "Prepare Data",
@@ -28,99 +28,81 @@
     },
     {
       "parameters": {
-        "method": "POST",
-        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpQueryAuth",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "Content-Type",
-              "value": "application/json"
-            }
-          ]
-        },
-        "sendQuery": true,
-        "queryParameters": {
-          "parameters": [
-            {
-              "name": "key",
-              "value": "={{$env.GEMINI_API_KEY}}"
-            }
-          ]
-        },
-        "sendBody": true,
-        "contentType": "json",
-        "body": {
-          "contents": [
-            {
-              "parts": [
-                {
-                  "text": "=Analyze this customer support message and provide a JSON response with sentiment analysis, intent classification, and a helpful response.\n\nCustomer Message: \"{{$node[\"Prepare Data\"].json[\"message\"]}}\"\n\nPlease respond with ONLY a JSON object in this exact format:\n{\n  \"sentiment\": \"positive\",\n  \"intent\": \"question\",\n  \"response\": \"Thank you for contacting us. [Your helpful response here]\"\n}\n\nSentiment options: positive, negative, neutral\nIntent options: question, complaint, compliment, request, other\nKeep response under 200 words and professional."
-                }
-              ]
-            }
-          ],
-          "generationConfig": {
-            "temperature": 0.3,
-            "topK": 40,
-            "topP": 0.95,
-            "maxOutputTokens": 512,
-            "candidateCount": 1
-          },
-          "safetySettings": [
-            {
-              "category": "HARM_CATEGORY_HARASSMENT",
-              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
-            }
-          ]
-        },
-        "options": {
-          "timeout": 30000
-        }
+        "chatId": "YOUR_TELEGRAM_CHAT_ID",
+        "text": "=🎫 *New Support Ticket*\n\n*Ticket ID:* {{ $json.ticketId }}\n*Subject:* {{ $json.subject }}\n*Email:* {{ $json.email }}\n*Timestamp:* {{ $json.timestamp }}\n\n*Message:*\n{{ $json.message }}",
+        "parseMode": "Markdown",
+        "additionalFields": {}
       },
-      "id": "gemini-api-node",
-      "name": "Gemini AI Analysis",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4,
-      "position": [640, 300]
+      "id": "telegram-node",
+      "name": "Send to Telegram",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1,
+      "position": [640, 200],
+      "credentials": {
+        "telegramApi": {
+          "id": "YOUR_TELEGRAM_CREDENTIALS_ID",
+          "name": "Telegram Bot Credentials"
+        }
+      }
     },
     {
       "parameters": {
-        "functionCode": "// Parse AI response and prepare webhook data\nconst aiResponse = $input.first().json;\n\nlet analysis;\ntry {\n  // Extract the text content from Gemini response\n  const responseText = aiResponse.candidates[0].content.parts[0].text;\n  \n  // Clean the response text (remove markdown formatting if present)\n  const cleanText = responseText.replace(/```json\\n?|```\\n?/g, '').trim();\n  \n  // Parse the JSON\n  analysis = JSON.parse(cleanText);\n  \n  // Validate required fields\n  if (!analysis.sentiment || !analysis.intent || !analysis.response) {\n    throw new Error('Missing required analysis fields');\n  }\n  \n} catch (error) {\n  console.error('Failed to parse AI response:', error);\n  // Fallback analysis\n  analysis = {\n    sentiment: 'neutral',\n    intent: 'other',\n    response: 'Thank you for contacting us. We have received your message and will respond as soon as possible.'\n  };\n}\n\n// Prepare data for the Next.js webhook\nconst preparedData = $node[\"Prepare Data\"].json;\n\nreturn {\n  ticketId: preparedData.ticketId,\n  email: preparedData.email,\n  subject: preparedData.subject,\n  analysis: analysis\n};"
+        "operation": "appendOrUpdate",
+        "documentId": "1O9bAKNfhJKOr8eQdbZrWr1aoVOHIIBzVXU3moR2vAaQ",
+        "sheetName": "Support Tickets",
+        "columnToMatchOn": "ticketId",
+        "valuesToMatchOn": "={{$node[\"Prepare Data\"].json[\"ticketId\"]}}",
+        "fieldsUi": {
+          "values": [
+            {
+              "fieldName": "Ticket ID",
+              "fieldValue": "={{$node[\"Prepare Data\"].json[\"ticketId\"]}}"
+            },
+            {
+              "fieldName": "Subject",
+              "fieldValue": "={{$node[\"Prepare Data\"].json[\"subject\"]}}"
+            },
+            {
+              "fieldName": "Email",
+              "fieldValue": "={{$node[\"Prepare Data\"].json[\"email\"]}}"
+            },
+            {
+              "fieldName": "Message",
+              "fieldValue": "={{$node[\"Prepare Data\"].json[\"message\"]}}"
+            },
+            {
+              "fieldName": "Timestamp",
+              "fieldValue": "={{$node[\"Prepare Data\"].json[\"timestamp\"]}}"
+            },
+            {
+              "fieldName": "Status",
+              "fieldValue": "={{$node[\"Prepare Data\"].json[\"status\"]}}"
+            }
+          ]
+        },
+        "options": {}
       },
-      "id": "process-response-node",
-      "name": "Process AI Response",
+      "id": "google-sheets-node",
+      "name": "Save to Google Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [1040, 300],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "YOUR_GOOGLE_SHEETS_CREDENTIALS_ID",
+          "name": "Google Sheets Credentials"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "functionCode": "// Combine results from sequential operations\nconst preparedData = $node[\"Prepare Data\"].json;\nconst telegramResult = $node[\"Send to Telegram\"].json;\nconst sheetsResult = $input.first().json; // Current node input from Google Sheets\n\nreturn {\n  success: true,\n  ticketId: preparedData.ticketId,\n  timestamp: preparedData.timestamp,\n  telegramSent: !!telegramResult.message_id,\n  sheetUpdated: !!sheetsResult.updatedRows || !!sheetsResult.spreadsheetId,\n  message: 'Support ticket processed successfully'\n};"
+      },
+      "id": "final-response-node",
+      "name": "Final Response",
       "type": "n8n-nodes-base.function",
       "typeVersion": 1,
       "position": [840, 300]
-    },
-    {
-      "parameters": {
-        "method": "POST",
-        "url": "={{$env.NEXT_PUBLIC_APP_URL}}/api/webhooks/n8n",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "Content-Type",
-              "value": "application/json"
-            }
-          ]
-        },
-        "sendBody": true,
-        "contentType": "json",
-        "body": "={{$json}}",
-        "options": {
-          "timeout": 10000
-        }
-      },
-      "id": "update-ticket-node",
-      "name": "Update Ticket",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4,
-      "position": [1040, 300]
     }
   ],
   "connections": {
@@ -139,29 +121,29 @@
       "main": [
         [
           {
-            "node": "Gemini AI Analysis",
+            "node": "Send to Telegram",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Gemini AI Analysis": {
+    "Send to Telegram": {
       "main": [
         [
           {
-            "node": "Process AI Response",
+            "node": "Save to Google Sheets",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Process AI Response": {
+    "Save to Google Sheets": {
       "main": [
         [
           {
-            "node": "Update Ticket",
+            "node": "Final Response",
             "type": "main",
             "index": 0
           }
@@ -177,5 +159,5 @@
   "tags": [],
   "triggerCount": 1,
   "updatedAt": "2025-01-30T00:00:00.000Z",
-  "versionId": "1"
+  "versionId": "2"
 }

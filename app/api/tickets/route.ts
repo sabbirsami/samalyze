@@ -7,12 +7,10 @@ export async function POST(request: Request) {
     const body = await request.json();
     console.log('Creating ticket with data:', body);
 
-    // Basic validation
     if (!body.email || !body.subject || !body.message) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    // Create ticket in MongoDB
     const ticketId = await createTicket({
       email: body.email,
       subject: body.subject,
@@ -21,7 +19,7 @@ export async function POST(request: Request) {
 
     console.log('Ticket created with ID:', ticketId);
 
-    // Send confirmation email first (sync to ensure it works)
+    // Send confirmation email
     try {
       await sendTicketResponseEmail(
         body.email,
@@ -31,13 +29,23 @@ export async function POST(request: Request) {
       console.log('Confirmation email sent successfully');
     } catch (emailError) {
       console.error('Failed to send confirmation email:', emailError);
-      // Continue even if confirmation email fails
     }
 
-    // Trigger n8n workflow - Fixed webhook URL structure
+    // FIXED: Send correct data structure to n8n
     if (process.env.N8N_WEBHOOK_URL) {
       try {
         console.log('Triggering n8n webhook:', process.env.N8N_WEBHOOK_URL);
+
+        // CORRECT structure that matches your curl test
+        const webhookPayload = {
+          // Remove the outer 'body' wrapper
+          ticketId: ticketId,
+          email: body.email,
+          subject: body.subject,
+          message: body.message,
+        };
+
+        console.log('Sending webhook payload:', JSON.stringify(webhookPayload, null, 2));
 
         const webhookResponse = await fetch(process.env.N8N_WEBHOOK_URL, {
           method: 'POST',
@@ -45,18 +53,19 @@ export async function POST(request: Request) {
             'Content-Type': 'application/json',
             'User-Agent': 'NextJS-App/1.0',
           },
-          body: JSON.stringify({
-            ticketId,
-            email: body.email,
-            subject: body.subject,
-            message: body.message,
-            timestamp: new Date().toISOString(),
-          }),
+          body: JSON.stringify(webhookPayload),
         });
 
+        const responseText = await webhookResponse.text();
+        console.log('n8n webhook response status:', webhookResponse.status);
+        console.log('n8n webhook response:', responseText);
+
         if (!webhookResponse.ok) {
-          const errorText = await webhookResponse.text();
-          console.error('n8n webhook failed:', errorText);
+          console.error('n8n webhook failed:', {
+            status: webhookResponse.status,
+            statusText: webhookResponse.statusText,
+            response: responseText,
+          });
         } else {
           console.log('n8n webhook triggered successfully');
         }
