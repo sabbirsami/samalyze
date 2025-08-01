@@ -10,7 +10,6 @@ let db: any;
 
 async function connect() {
   if (db) return db;
-
   try {
     client = new MongoClient(uri);
     await client.connect();
@@ -72,11 +71,39 @@ export async function updateTicket(
   }
 }
 
+export async function deleteTicket(id: string) {
+  try {
+    const db = await connect();
+    const result = await db.collection(collectionName).deleteOne({
+      _id: new ObjectId(id),
+    });
+    console.log('Ticket deleted from MongoDB:', result);
+    return result;
+  } catch (error) {
+    console.error('Error deleting ticket from MongoDB:', error);
+    throw error;
+  }
+}
+
+export async function deleteMultipleTickets(ids: string[]) {
+  try {
+    const db = await connect();
+    const objectIds = ids.map((id) => new ObjectId(id));
+    const result = await db.collection(collectionName).deleteMany({
+      _id: { $in: objectIds },
+    });
+    console.log('Multiple tickets deleted from MongoDB:', result);
+    return result;
+  } catch (error) {
+    console.error('Error deleting multiple tickets from MongoDB:', error);
+    throw error;
+  }
+}
+
 export async function getTickets() {
   try {
     const db = await connect();
     const tickets = await db.collection(collectionName).find().sort({ createdAt: -1 }).toArray();
-
     // Convert MongoDB documents to match expected format
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return tickets.map((ticket: any) => ({
@@ -97,18 +124,43 @@ export async function getTickets() {
   }
 }
 
+export async function getTicketById(id: string) {
+  try {
+    const db = await connect();
+    const ticket = await db.collection(collectionName).findOne({
+      _id: new ObjectId(id),
+    });
+
+    if (!ticket) return null;
+
+    return {
+      id: ticket._id.toString(),
+      email: ticket.email,
+      subject: ticket.subject,
+      message: ticket.message,
+      status: ticket.status,
+      sentiment: ticket.sentiment,
+      intent: ticket.intent,
+      ai_response: ticket.ai_response,
+      created_at: ticket.createdAt,
+      updated_at: ticket.updatedAt,
+    };
+  } catch (error) {
+    console.error('Error getting ticket by ID from MongoDB:', error);
+    return null;
+  }
+}
+
 export async function getTicketStats() {
   try {
     const db = await connect();
     const collection = db.collection(collectionName);
-
     const [total, pending, processing, resolved] = await Promise.all([
       collection.countDocuments(),
       collection.countDocuments({ status: 'pending' }),
       collection.countDocuments({ status: 'processing' }),
       collection.countDocuments({ status: 'resolved' }),
     ]);
-
     return { total, pending, processing, resolved };
   } catch (error) {
     console.error('Error getting ticket stats from MongoDB:', error);

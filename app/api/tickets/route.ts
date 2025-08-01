@@ -1,6 +1,16 @@
 import { sendTicketResponseEmail } from '@/lib/email';
-import { createTicket } from '@/lib/mongodb';
+import { createTicket, getTickets } from '@/lib/mongodb';
 import { NextResponse } from 'next/server';
+
+export async function GET() {
+  try {
+    const tickets = await getTickets();
+    return NextResponse.json(tickets);
+  } catch (error) {
+    console.error('Error fetching tickets:', error);
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+  }
+}
 
 export async function POST(request: Request) {
   try {
@@ -35,7 +45,6 @@ export async function POST(request: Request) {
     if (process.env.N8N_WEBHOOK_URL) {
       try {
         console.log('Triggering n8n webhook:', process.env.N8N_WEBHOOK_URL);
-
         // CORRECT structure that matches your curl test
         const webhookPayload = {
           // Remove the outer 'body' wrapper
